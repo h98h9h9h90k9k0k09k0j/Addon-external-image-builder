@@ -45,4 +45,4 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 EXPOSE 5000 50051
 
 # Command to run the Home Assistant add-on
-CMD ["bash", "run.sh"]
+# CMD ["bash", "run.sh"]
