@@ -1,0 +1,49 @@
+import unittest
+from unittest.mock import patch, MagicMock
+import grpc
+from concurrent import futures
+from serve import serve
+
+class TestServeFunction(unittest.TestCase):
+
+    @patch('grpc.server')
+    @patch('workloads_pb2_grpc.add_VideoStreamerServicer_to_server')
+    @patch('workloads_pb2_grpc.add_TaskManagerServicer_to_server')
+    @patch('time.sleep', side_effect=KeyboardInterrupt)
+    def test_serve_keyboard_interrupt(self, mock_sleep, mock_add_task_servicer, mock_add_video_servicer, mock_grpc_server):
+        mock_server = MagicMock()
+        mock_grpc_server.return_value = mock_server
+
+        with self.assertLogs(level='INFO') as log:
+            serve()
+            self.assertIn('INFO:root:Server started successfully', log.output)
+            self.assertIn('INFO:root:Server stopping due to keyboard interrupt', log.output)
+            self.assertIn('INFO:root:Server stopped', log.output)
+
+        mock_server.stop.assert_called_once_with(0)
+
+    @patch('grpc.server', side_effect=Exception('Server creation error'))
+    @patch('workloads_pb2_grpc.add_VideoStreamerServicer_to_server')
+    @patch('workloads_pb2_grpc.add_TaskManagerServicer_to_server')
+    def test_serve_server_creation_error(self, mock_add_task_servicer, mock_add_video_servicer, mock_grpc_server):
+        with self.assertLogs(level='ERROR') as log:
+            serve()
+            self.assertIn('ERROR:root:Server error: Server creation error', log.output)
+
+    @patch('grpc.server')
+    @patch('workloads_pb2_grpc.add_VideoStreamerServicer_to_server')
+    @patch('workloads_pb2_grpc.add_TaskManagerServicer_to_server')
+    @patch('time.sleep', side_effect=Exception('Sleep error'))
+    def test_serve_runtime_error(self, mock_sleep, mock_add_task_servicer, mock_add_video_servicer, mock_grpc_server):
+        mock_server = MagicMock()
+        mock_grpc_server.return_value = mock_server
+
+        with self.assertLogs(level='ERROR') as log:
+            serve()
+            self.assertIn('ERROR:root:Server error: Sleep error', log.output)
+            self.assertIn('INFO:root:Server stopped', log.output)
+
+        mock_server.stop.assert_called_once_with(0)
+
+if __name__ == '__main__':
+    unittest.main()
