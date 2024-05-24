@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y \
     python3.11-venv \
     git \
     dos2unix \
+    libgtk2.0-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -45,4 +47,4 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 EXPOSE 5000 50051
 
 # Command to run the Home Assistant add-on
-# CMD ["bash", "run.sh"]
+CMD ["bash", "run.sh"]
