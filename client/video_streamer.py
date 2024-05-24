@@ -14,7 +14,7 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
     def __init__(self):
         # Initialize the face recognizer and other necessary components
         self.recognizer = cv2.face.LBPHFaceRecognizer_create()
-        self.recognizer.read('trainer/trainer.yml')
+        #self.recognizer.read('trainer/trainer.yml')
         self.faceCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
         self.face_detector = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         self.bg_subtractor = cv2.createBackgroundSubtractorMOG2()
@@ -30,7 +30,7 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
 
         if processing_type == 'face_recognition':
             # Load the face recognizer model
-            self.recognizer.read('trainer/trainer.yml')
+            #self.recognizer.read('trainer/trainer.yml')
             self.count = 0
         elif processing_type == 'motion_detection':
             self.current_path = "img_motion_det" #  Please, Check if path is created inside client folder
@@ -65,14 +65,14 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
                             logging.error(f"Error decoding frame: {str(e)}")
                             # print error message
                             print(f"Error decoding frame: {str(e)}")
-                            return workloads_pb2.VideoResponse(message="Error decoding frame")
+                            yield workloads_pb2.VideoResponse(message="Error decoding frame")
                     else:
                         break
                 except Exception as e:
                     logging.error(f"Error finding start and end markers: {str(e)}")
                     print(f"Error finding start and end markers: {str(e)}")
-                    return workloads_pb2.VideoResponse(message="Error finding start and end markers")
-        return workloads_pb2.VideoResponse(message="Stream processing completed")
+                    yield workloads_pb2.VideoResponse(message="Error finding start and end markers")
+        yield workloads_pb2.VideoResponse(message="Stream processing completed")
     
     def face_recognition(self, frame):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
