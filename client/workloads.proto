@@ -4,7 +4,7 @@ package workloads;
 
 // Service definition for handling video streaming
 service VideoStreamer {
-  rpc StreamVideo (stream VideoChunk) returns (VideoResponse);
+  rpc StreamVideo (stream VideoChunk) returns (stream VideoResponse);
 }
 
 // Service definition for general task management

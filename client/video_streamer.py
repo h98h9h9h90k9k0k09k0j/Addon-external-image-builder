@@ -60,6 +60,7 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
                                     result_message = self.emotion_recognition(frame)
 
                                 if result_message:
+                                    logging.info(f"Sending response: {result_message}")
                                     yield workloads_pb2.VideoResponse(message=result_message)
                         except Exception as e:
                             logging.error(f"Error decoding frame: {str(e)}")
