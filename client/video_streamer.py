@@ -21,7 +21,7 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
             self.current_path = ""
             self.count = 0
             self.lock = threading.Lock()
-            self.frame_queue = queue.Queue()  # Queue for frame handling
+            self.frame_queue = queue.Queue(maxsize=30)  # Queue for frame handling
             self.processing = False  # Flag to indicate if processing is ongoing
             self.recognizer = cv2.face.LBPHFaceRecognizer_create()
             self.face_database_path = 'dataset'
@@ -81,6 +81,7 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
 
             if result_message:
                 logging.info(f"Processed frame result: {result_message}")
+                yield workloads_pb2.VideoResponse(message=result_message)
                 # Handle sending response back to the client if needed
         self.processing = False
 
