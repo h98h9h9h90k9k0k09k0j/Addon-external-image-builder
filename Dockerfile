@@ -23,9 +23,6 @@ WORKDIR /app
 # Copy only the requirements file to leverage Docker cache
 COPY requirements.txt /app/requirements.txt
 
-# Convert any scripts that might have Windows line endings to Unix line endings
-RUN dos2unix /app/run.sh
-
 # Create a virtual environment in the /opt/venv directory
 RUN python3 -m venv /opt/venv \
     && . /opt/venv/bin/activate 
