@@ -20,8 +20,8 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy data for add-on
-COPY . /app
+# Copy only the requirements file to leverage Docker cache
+COPY requirements.txt /app/requirements.txt
 
 # Convert any scripts that might have Windows line endings to Unix line endings
 RUN dos2unix /app/run.sh
@@ -36,6 +36,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Install Python packages in the virtual environment
 RUN pip install --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
+
+# Copy data for add-on
+COPY . /app
 
 # Ensure the main script is executable
 RUN chmod +x /app/run.sh
