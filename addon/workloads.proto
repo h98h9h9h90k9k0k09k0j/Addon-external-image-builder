@@ -4,41 +4,40 @@ package workloads;
 
 // Service definition for handling video streaming
 service VideoStreamer {
-  rpc StreamVideo (stream VideoChunk) returns (stream VideoResponse);
+  rpc StreamVideo (stream VideoChunk) returns (TaskResponse);
 }
 
 // Service definition for general task management
 service TaskManager {
   rpc SendTask (TaskRequest) returns (TaskResponse);
-  rpc StreamTask (stream TaskChunk) returns (TaskResponse);
+  rpc RetrieveFrames (TaskRequest) returns (FrameResponse);
 }
 
 // Message for video chunk data
 message VideoChunk {
   bytes data = 1;
-  string processing_type = 2;  // Added processing_type field
+  string processing_type = 2;
 }
 
-// Response message for video stream
-message VideoResponse {
+// Response message for general task
+message TaskResponse {
   string message = 1;
+  string task_id = 2;
 }
 
-// Message for general task request
+// Request message for general task
 message TaskRequest {
   string task_id = 1;
   string task_type = 2;
   string payload = 3;
 }
 
-// Message for general task response
-message TaskResponse {
-  string message = 1;
-  string task_id = 2;
+// Response message for retrieved frames
+message FrameResponse {
+  repeated FrameData frames = 1;
 }
 
-// Message for task chunk data (similar to VideoChunk but for general tasks)
-message TaskChunk {
-  bytes data = 1;
-  string task_id = 2;
+message FrameData {
+  bytes image = 1;
+  string timestamp = 2;
 }

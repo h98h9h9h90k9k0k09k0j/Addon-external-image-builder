@@ -1,17 +1,14 @@
 import datetime
 import logging
 import os
-import time
-import grpc
-from concurrent import futures
-import workloads_pb2
-import workloads_pb2_grpc
 import cv2
 import numpy as np
-from deepface import DeepFace
 import threading
 import queue
 from PIL import Image
+import workloads_pb2
+import workloads_pb2_grpc
+from deepface import DeepFace
 
 class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
     def __init__(self):
@@ -21,16 +18,17 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
             self.current_path = ""
             self.count = 0
             self.lock = threading.Lock()
-            self.frame_queue = queue.Queue(maxsize=30)  # Queue for frame handling
-            self.processing = False  # Flag to indicate if processing is ongoing
+            self.frame_queue = queue.Queue(maxsize=30)
+            self.processing = False
             self.recognizer = cv2.face.LBPHFaceRecognizer_create()
             self.face_database_path = 'dataset'
             os.makedirs(self.face_database_path, exist_ok=True)
             self.trainer_file_path = os.path.join(self.face_database_path, 'trainer.yml')
             self.motion_detection_path = "img_motion_det"
             os.makedirs(self.motion_detection_path, exist_ok=True)
-            self.max_saved_images = 100  # Limit the number of saved images
+            self.max_saved_images = 100
             self.recognizer_trained = False
+            self.processed_frames = []
             self.train_recognizer()
         except Exception as e:
             logging.error(f"Initialization error: {e}")
@@ -54,8 +52,6 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
                         buffer = buffer[end+2:]
                         frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
                         if frame is not None:
-                            #logging.info("Frame received correctly")
-                            #yield workloads_pb2.VideoResponse(message="Frame received correctly")
                             self.frame_queue.put((frame, processing_type))
                             if not self.processing:
                                 self.processing = True
@@ -64,14 +60,15 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
                             break
                     else:
                         break
-            yield workloads_pb2.VideoResponse(message="Stream processing completed")
+            return workloads_pb2.TaskResponse(message="Stream processing completed", task_id="")
         except Exception as e:
             logging.error(f"Error in StreamVideo method: {e}")
-            yield workloads_pb2.VideoResponse(message="StreamVideo method error")
+            return workloads_pb2.TaskResponse(message="StreamVideo method error", task_id="")
 
     def process_frames(self):
         while not self.frame_queue.empty():
             frame, processing_type = self.frame_queue.get()
+            result_message = ""
             if processing_type == 'face_recognition':
                 result_message = self.face_recognition(frame)
             elif processing_type == 'motion_detection':
@@ -81,8 +78,13 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
 
             if result_message:
                 logging.info(f"Processed frame result: {result_message}")
-                yield workloads_pb2.VideoResponse(message=result_message)
-                # Handle sending response back to the client if needed
+                # Save processed frame for retrieval
+                _, buffer = cv2.imencode('.jpg', frame)
+                frame_data = workloads_pb2.FrameData(image=buffer.tobytes(), timestamp=datetime.datetime.now().isoformat())
+                self.processed_frames.append(frame_data)
+                # Remove old frames if necessary
+                if len(self.processed_frames) > self.max_saved_images:
+                    self.processed_frames.pop(0)
         self.processing = False
 
     def face_recognition(self, frame):
@@ -93,8 +95,7 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
                 if self.recognizer_trained:
                     id, confidence = self.recognizer.predict(gray[y:y + h, x:x + w])
-
-                    if confidence < 50:  # Adjust confidence threshold for better accuracy
+                    if confidence < 50:
                         confidence_text = f"{round(100 - confidence)}%"
                         name = f"User {id}"
                     else:
@@ -110,7 +111,7 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
                             face_id = self.count
                             user_dir = f"{self.face_database_path}/User_{face_id}"
                             os.makedirs(user_dir, exist_ok=True)
-                            for i in range(5):  # Capture multiple images for better training
+                            for i in range(5):
                                 face_path = f"{user_dir}/User.{face_id}.{i + 1}.jpg"
                                 cv2.imwrite(face_path, gray[y:y + h, x:x + w])
                             self.train_recognizer()
@@ -122,7 +123,7 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
                         face_id = self.count
                         user_dir = f"{self.face_database_path}/User_{face_id}"
                         os.makedirs(user_dir, exist_ok=True)
-                        for i in range(5):  # Capture multiple images for better training
+                        for i in range(5):
                             face_path = f"{user_dir}/User.{face_id}.{i + 1}.jpg"
                             cv2.imwrite(face_path, gray[y:y + h, x:x + w])
                         self.train_recognizer()
@@ -136,9 +137,8 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
         except Exception as e:
             logging.error(f"Error in face_recognition method: {e}")
             return "Face recognition error"
-        
+
     def train_recognizer(self):
-        # Train the face recognizer with images in the dataset
         try:
             face_samples, ids = self.get_images_and_labels(self.face_database_path)
             if len(face_samples) > 0:
@@ -161,7 +161,7 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
                 for image_name in os.listdir(user_path):
                     if image_name.endswith('.jpg'):
                         image_path = os.path.join(user_path, image_name)
-                        pil_img = Image.open(image_path).convert('L')  # convert it to grayscale
+                        pil_img = Image.open(image_path).convert('L')
                         img_numpy = np.array(pil_img, 'uint8')
                         face_id = int(user_dir.split('_')[-1])
                         faces = self.faceCascade.detectMultiScale(img_numpy)
@@ -169,7 +169,6 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
                             face_samples.append(img_numpy[y:y + h, x:x + w])
                             ids.append(face_id)
         return face_samples, ids
-
 
     def motion_detection(self, frame):
         try:
@@ -202,7 +201,6 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
             return "Motion detection error"
 
     def cleanup_old_images(self, directory):
-        # Remove old images if the total number exceeds the max_saved_images
         image_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.jpg')]
         if len(image_files) > self.max_saved_images:
             image_files.sort(key=os.path.getctime)
@@ -227,18 +225,3 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
         except Exception as e:
             logging.error(f"Error in emotion_recognition method: {e}")
             return "Emotion recognition error"
-
-def serve():
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    workloads_pb2_grpc.add_VideoStreamerServicer_to_server(VideoStreamerServicer(), server)
-    server.add_insecure_port('[::]:50051')
-    server.start()
-    try:
-        while True:
-            time.sleep(86400)
-    except KeyboardInterrupt:
-        server.stop(0)
-
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    serve()
