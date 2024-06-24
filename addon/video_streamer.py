@@ -26,7 +26,7 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
             self.trainer_file_path = os.path.join(self.face_database_path, 'trainer.yml')
             self.motion_detection_path = "img_motion_det"
             os.makedirs(self.motion_detection_path, exist_ok=True)
-            self.max_saved_images = 100
+            self.max_saved_images = 50
             self.recognizer_trained = False
             self.processed_frames = []
             self.train_recognizer()
@@ -117,7 +117,6 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
                                 face_path = f"{user_dir}/User.{face_id}.{i + 1}.jpg"
                                 cv2.imwrite(face_path, gray[y:y + h, x:x + w])
                             self.train_recognizer()
-                            logging.info(f"Saved new face as {face_path}")
                             return f"New face detected and saved as {face_path}"
                 else:
                     with self.lock:
@@ -129,10 +128,8 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
                             face_path = f"{user_dir}/User.{face_id}.{i + 1}.jpg"
                             cv2.imwrite(face_path, gray[y:y + h, x:x + w])
                         self.train_recognizer()
-                        logging.info(f"Saved new face as {face_path}")
                         return f"New face detected and saved as {face_path}"
-
-            return "Face recognition completed"
+            return f"Face recognition completed: saw user {name} with confidence {confidence_text}"
         except cv2.error as e:
             logging.error(f"OpenCV error in face_recognition method: {e}")
             return "Face recognition error"
@@ -192,11 +189,9 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
                     os.makedirs(date_path, exist_ok=True)
                     image_path = os.path.join(date_path, f"frame_{date_time}.jpg")
                     cv2.imwrite(image_path, frame)
-                    logging.info(f"Motion detected and saved as {image_path}")
                     self.cleanup_old_images(date_path)
                     return f"Motion detected and saved as {image_path}"
                 else:
-                    logging.info("No significant motion detected")
                     return "No significant motion detected"
         except Exception as e:
             logging.error(f"Error in motion_detection method: {e}")
