@@ -43,6 +43,8 @@ class VideoStreamerServicer(workloads_pb2_grpc.VideoStreamerServicer):
 
             for chunk in request_iterator:
                 buffer += chunk.data
+                if chunk.processing_type != processing_type:
+                    processing_type = chunk.processing_type
                 start = 0
                 while True:
                     start = buffer.find(b'\xff\xd8', start)
